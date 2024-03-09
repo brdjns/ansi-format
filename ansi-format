@@ -1,0 +1,127 @@
+#!/usr/bin/python3
+
+import pathlib
+import argparse
+from typing import Tuple
+from io import StringIO
+import sys
+
+
+def is_cxx_comment(line: str) -> Tuple[bool, str | None, str | None, int]:
+    """
+    Checks if line contains a '//' C++ style comment, returns tuple
+    of type [LineHasComment, Comment, RestOfLine, IndentWidth]
+    """
+    start_pos = line.find("//")
+
+    if start_pos != -1:
+
+        code = line[0:start_pos]
+        code_rstrip = code.rstrip()
+        indent_width = len(code) - len(code_rstrip)
+
+        return (True, line[start_pos + 2 :].lstrip(), code_rstrip, indent_width)
+
+    return (False, None, None, 0)
+
+
+def parse(io: StringIO, f: pathlib.Path):
+    source = f.read_text("utf-8")
+    source_lines = [line for line in source.splitlines()]
+    block_mode = False
+    indent_width = 0
+
+    for i, line in enumerate(source_lines):
+        # check if this is a start of a block
+        is_comment, comment, rest_of_code, line_indent_width = is_cxx_comment(line)
+
+        # Allow updating indent width only if block mode is off
+        if not block_mode:
+            indent_width = line_indent_width
+
+        is_comment_next = False
+        if i + 1 < len(source_lines):
+            is_comment_next, _, _, _ = is_cxx_comment(source_lines[i + 1])
+
+        if is_comment:
+            if not block_mode and is_comment_next:
+                io.write(" " * indent_width)
+                io.write("/*\n")
+                block_mode = True
+
+            if block_mode:
+                io.write(" " * indent_width)
+                io.writelines([" * ", comment, "\n"])
+
+                # check if this is the end of the block
+                if not is_comment_next:
+                    io.write(" " * indent_width)
+                    io.write(" */\n")
+                    block_mode = False
+            else:
+                io.write(" " * indent_width)
+                if rest_of_code:
+                    io.writelines([rest_of_code, " /* ", comment, " */\n"])
+                else:
+                    io.writelines(["/* ", comment, " */\n"])
+        else:
+            io.writelines([line, "\n"])
+
+
+def print_verbose(is_verbose: bool, line: str):
+    if is_verbose:
+        print(line, file=sys.stderr)
+
+
+def main():
+    argument_parser = argparse.ArgumentParser(
+        description="C/C++ Ansi Comment Converter",
+        epilog="Author: Ron Shabi <ron@ronsh.net>",
+    )
+
+    argument_parser.add_argument("files", help="Source file to parse", nargs="+")
+    argument_parser.add_argument(
+        "--verbose", "-v", action="store_true", help="Verbose output"
+    )
+    argument_parser.add_argument(
+        "--inplace", "-i", action="store_true", help="Inplace edit"
+    )
+
+    args = argument_parser.parse_args()
+    verbose = args.verbose
+    inplace = args.inplace
+    has_errors = False
+    errored_files = []
+    formatted_files = set()
+
+    for src_file in args.files:
+        try:
+            if src_file in formatted_files:
+                print_verbose(
+                    verbose, f"Warning: File {src_file} was already formatted"
+                )
+                continue
+
+            io = StringIO()
+            parse(io, pathlib.Path(src_file))
+            formatted_files.add(src_file)
+            print_verbose(verbose, f"Formatted '{src_file}'")
+
+            if inplace:
+                with open(src_file, mode="w") as f:
+                    print(io.getvalue(), file=f)
+            else:
+                print(io.getvalue())
+
+        except FileNotFoundError:
+            has_errors = True
+            errored_files.append(src_file)
+            print(f"Error: File '{src_file}' was not found", file=sys.stderr)
+
+    if has_errors:
+        print("Note: errors occurred while formatting", file=sys.stderr)
+        exit(1)
+
+
+if __name__ == "__main__":
+    main()
