@@ -1,5 +1,8 @@
 #!/usr/bin/python3
 
+# Copyright (c) 2024, Ron Shabi <ron@ronsh.net>
+# SPDX-License-Identifier: BSD-2-Clause
+
 import pathlib
 import argparse
 from typing import Tuple
