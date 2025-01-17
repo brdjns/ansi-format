@@ -57,7 +57,7 @@ def parse(io: StringIO, f: pathlib.Path):
                 io.write(" " * indent_width)
                 # The first element is the initial separator to use for
                 # each subsequent line.
-                io.writelines(["   ", comment, "\n"])
+                io.writelines([" * ", comment, "\n"])
 
                 # Check if this is the end of the block.
                 if not is_comment_next:
