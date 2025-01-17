@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 # Copyright (c) 2024, Ron Shabi <ron@ronsh.net>
+# Copyright (c) 2025, Bradley Jones <brdjns@gmx.us>
 # SPDX-License-Identifier: BSD-2-Clause
 
 import pathlib
@@ -12,7 +13,7 @@ import sys
 
 def is_cxx_comment(line: str) -> Tuple[bool, str | None, str | None, int]:
     """
-    Checks if line contains a '//' C++ style comment, returns tuple
+    Checks if line contains a '//' C++ style comment; returns a tuple
     of type [LineHasComment, Comment, RestOfLine, IndentWidth]
     """
     start_pos = line.find("//")
@@ -35,10 +36,10 @@ def parse(io: StringIO, f: pathlib.Path):
     indent_width = 0
 
     for i, line in enumerate(source_lines):
-        # check if this is a start of a block
+        # Check if this is a start of a block.
         is_comment, comment, rest_of_code, line_indent_width = is_cxx_comment(line)
 
-        # Allow updating indent width only if block mode is off
+        # Allow updating indent-width only if block mode is off.
         if not block_mode:
             indent_width = line_indent_width
 
@@ -49,14 +50,16 @@ def parse(io: StringIO, f: pathlib.Path):
         if is_comment:
             if not block_mode and is_comment_next:
                 io.write(" " * indent_width)
-                io.write("/*\n")
+                io.writelines(["/* ", comment, "\n"])
                 block_mode = True
 
             if block_mode:
                 io.write(" " * indent_width)
-                io.writelines([" * ", comment, "\n"])
+                # The first element is the initial separator to use for
+                # each subsequent line.
+                io.writelines(["   ", comment, "\n"])
 
-                # check if this is the end of the block
+                # Check if this is the end of the block.
                 if not is_comment_next:
                     io.write(" " * indent_width)
                     io.write(" */\n")
@@ -78,16 +81,16 @@ def print_verbose(is_verbose: bool, line: str):
 
 def main():
     argument_parser = argparse.ArgumentParser(
-        description="C/C++ Ansi Comment Converter",
+        description="C and C++ ANSI Comment Converter",
         epilog="Author: Ron Shabi <ron@ronsh.net>",
     )
 
-    argument_parser.add_argument("files", help="Source file to parse", nargs="+")
+    argument_parser.add_argument("files", help="Source-file to parse", nargs="+")
     argument_parser.add_argument(
         "--verbose", "-v", action="store_true", help="Verbose output"
     )
     argument_parser.add_argument(
-        "--inplace", "-i", action="store_true", help="Inplace edit"
+        "--inplace", "-i", action="store_true", help="In-place edit"
     )
 
     args = argument_parser.parse_args()
@@ -100,9 +103,7 @@ def main():
     for src_file in args.files:
         try:
             if src_file in formatted_files:
-                print_verbose(
-                    verbose, f"Warning: File {src_file} was already formatted"
-                )
+                print_verbose(verbose, f"Warning: File {src_file} already formatted")
                 continue
 
             io = StringIO()
@@ -119,7 +120,7 @@ def main():
         except FileNotFoundError:
             has_errors = True
             errored_files.append(src_file)
-            print(f"Error: File '{src_file}' was not found", file=sys.stderr)
+            print(f"Error: File '{src_file}' not found", file=sys.stderr)
 
     if has_errors:
         print("Note: errors occurred while formatting", file=sys.stderr)
